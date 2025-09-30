@@ -1,0 +1,26 @@
+# Data handling
+pandas
+scipy
+numpy<2.0
+
+# Image processing / augmentations
+
+opencv-python<4.11
+opencv-python-headless<4.11
+Pillow
+albumentations
+
+# Deep learning framework
+torch
+torchvision
+torchaudio
+
+# Dataset & evaluation tools
+tqdm
+scikit-learn  # metrics (F1, confusion matrix)
+matplotlib     # visualization
+seaborn        # confusion matrix heatmaps
+
+# nuScenes devkit (for nuImages dataset handling)
+#nuscenes-devkit
+

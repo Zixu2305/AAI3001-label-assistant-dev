@@ -1,0 +1,79 @@
+{
+  "paths": {
+    "proj_root": "/home/shoo/personal/dlDev/school/classificationProject",
+    "meta_dir":  "{proj_root}/meta",
+    "crops_dir": "{proj_root}/crops",
+    "manifest":  "{meta_dir}/manifest.csv",
+    "classes":   "{meta_dir}/classes.json",
+    "runs_dir":  "{proj_root}/runs"
+  },
+
+  "split": { "train": 0.70, "val": 0.15, "test": 0.15, "seed": 42 },
+  "filters": { "min_iou": 0.6, "min_ioa": 0.6 },
+
+  "dataloader": {
+    "batch_size": 64,
+    "num_workers": 6,
+    "pin_memory": true,
+    "persistent_workers": false,
+    "prefetch_factor": 2,
+    "drop_last": true
+  },
+
+  "preprocess": { "image_size": 224, "normalize": "imagenet", "letterbox": true },
+
+  "augment": {
+    "hflip_p": 0.5,
+    "vflip_p": 0.5,
+    "rotation_deg": 36,
+    "scale_min": 0.8,
+    "scale_max": 1.2
+  },
+
+  "model": {
+    "arch": "efficientnet_v2_s",
+    "pretrained": true,
+    "head_hidden": [1024, 512, 256],
+    "head_dropout": 0.25,
+    "head_norm": "batchnorm"
+  },
+
+  "stage_A": {
+    "epochs": 5,
+    "freeze": "all_but_head",
+    "optimizer": { "type": "adamw", "lr": 5e-4, "weight_decay": 0.01 },
+    "scheduler": { "type": "reduce_on_plateau", "patience": 5, "factor": 0.5, "min_lr": 1e-6 },
+    "loss": {
+      "type": "cross_entropy",
+      "label_smoothing": 0.0,
+      "class_weights": { "mode": "inv_freq", "normalize_mean_to_1": true, "clip_min": 0.25, "clip_max": 4.0 }
+    }
+  },
+
+  "stage_B": {
+    "epochs": 95,
+    "unfreeze_patterns": ["^features\\.(7|8)\\b", "classifier"],
+    "optimizer": {
+      "type": "adamw",
+      "param_groups": [
+        { "pattern": "^features\\.(7|8)\\b", "lr": 1e-4, "weight_decay": 0.01 },
+        { "pattern": "classifier",     "lr": 5e-4, "weight_decay": 0.01 }
+      ]
+    },
+    "scheduler": { "type": "reduce_on_plateau", "patience": 3, "factor": 0.5, "min_lr": 1e-6 },
+    "loss": {
+      "type": "focal",
+      "gamma": 2.0,
+      "alpha": { "mode": "effective_number", "beta": 0.999, "normalize_mean_to_1": true }
+    },
+	"last_k_blocks": 1
+  },
+
+  "metrics": {
+    "select_by": "val_macro_f1",
+    "early_stop_on": "none",
+    "early_stop_patience": 8
+  },
+
+  "logging": { "save_confusion": true, "save_curves": true, "gradcam_samples_per_class": 0,"print_stageB_trainable": true }
+}

@@ -1,0 +1,98 @@
+{
+  "version": "1.0",
+  "notes": "Canonical 10-class mapping for nuImages-derived crops. 'nuimage_prefixes' are wildcard-like startswith() patterns used during remapping.",
+  "classes": [
+    {
+      "id": 0,
+      "name": "car",
+      "display_name": "Car",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.car"],
+      "color": "#1f77b4"
+    },
+    {
+      "id": 1,
+      "name": "truck",
+      "display_name": "Truck",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.truck"],
+      "color": "#ff7f0e"
+    },
+    {
+      "id": 2,
+      "name": "bus",
+      "display_name": "Bus",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.bus"],
+      "color": "#2ca02c"
+    },
+    {
+      "id": 3,
+      "name": "trailer",
+      "display_name": "Trailer",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.trailer"],
+      "color": "#d62728"
+    },
+    {
+      "id": 4,
+      "name": "construction_vehicle",
+      "display_name": "Construction Vehicle",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.construction"],
+      "color": "#9467bd"
+    },
+    {
+      "id": 5,
+      "name": "pedestrian",
+      "display_name": "Pedestrian",
+      "group": "human",
+      "nuimage_prefixes": ["human.pedestrian"],
+      "color": "#8c564b"
+    },
+    {
+      "id": 6,
+      "name": "motorcycle",
+      "display_name": "Motorcycle",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.motorcycle"],
+      "color": "#e377c2"
+    },
+    {
+      "id": 7,
+      "name": "bicycle",
+      "display_name": "Bicycle",
+      "group": "vehicle",
+      "nuimage_prefixes": ["vehicle.bicycle"],
+      "color": "#7f7f7f"
+    },
+    {
+      "id": 8,
+      "name": "traffic_cone",
+      "display_name": "Traffic Cone",
+      "group": "movable_object",
+      "nuimage_prefixes": ["movable_object.trafficcone"],
+      "color": "#bcbd22"
+    },
+    {
+      "id": 9,
+      "name": "barrier",
+      "display_name": "Barrier",
+      "group": "object",
+      "nuimage_prefixes": ["movable_object.barrier", "static_object.barricade"],
+      "color": "#17becf"
+    }
+  ],
+  "index_order": [
+    "car",
+    "truck",
+    "bus",
+    "trailer",
+    "construction_vehicle",
+    "pedestrian",
+    "motorcycle",
+    "bicycle",
+    "traffic_cone",
+    "barrier"
+  ]
+}
