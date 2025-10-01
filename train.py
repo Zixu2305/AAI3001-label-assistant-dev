@@ -351,6 +351,8 @@ def build_model(cfg, num_classes):
         model = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None)
     elif arch == "convnext_tiny":
         model = models.convnext_tiny(weights=models.ConvNeXt_Tiny_Weights.IMAGENET1K_V1 if pretrained else None)
+    elif arch == "convnext_small":
+        model = models.convnext_small(weights=models.ConvNeXt_Small_Weights.IMAGENET1K_V1 if pretrained else None)
     elif arch == "efficientnet_v2_s":
         model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.IMAGENET1K_V1 if pretrained else None)
     elif arch == "mobilenet_v3_large":
@@ -658,6 +660,7 @@ def main():
     # model & device setup
     num_classes = len(name_to_id)
     model = build_model(cfg, num_classes=num_classes)
+    print(model)
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # speed hints

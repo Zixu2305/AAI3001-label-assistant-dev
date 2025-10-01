@@ -31,7 +31,7 @@
   },
 
   "model": {
-    "arch": "efficientnet_v2_s",
+    "arch": "convnext_small",
     "pretrained": true,
     "head_hidden": [1024, 512, 256],
     "head_dropout": 0.25,
@@ -52,11 +52,11 @@
 
   "stage_B": {
     "epochs": 95,
-    "unfreeze_patterns": ["^features\\.(7|8)\\b", "classifier"],
+    "unfreeze_patterns": ["^features\\.7\\b", "classifier"],
     "optimizer": {
       "type": "adamw",
       "param_groups": [
-        { "pattern": "^features\\.(7|8)\\b", "lr": 1e-4, "weight_decay": 0.01 },
+        { "pattern": "^features\\.7\\b", "lr": 1e-4, "weight_decay": 0.01 },
         { "pattern": "classifier",     "lr": 5e-4, "weight_decay": 0.01 }
       ]
     },
