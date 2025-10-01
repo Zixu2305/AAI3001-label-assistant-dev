@@ -1,9 +1,0 @@
-numpy
-pandas
-pillow
-torch
-torchvision
-streamlit
-opencv-python-headless
-huggingface-hub
-# (optional) streamlit-drawable-canvas
