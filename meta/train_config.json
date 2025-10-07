@@ -31,11 +31,11 @@
   },
 
   "model": {
-    "arch": "convnext_small",
+    "arch": "convnext_tiny",
     "pretrained": true,
     "head_hidden": [1024, 512, 256],
     "head_dropout": 0.25,
-    "head_norm": "batchnorm"
+    "head_norm": "layernorm"
   },
 
   "stage_A": {

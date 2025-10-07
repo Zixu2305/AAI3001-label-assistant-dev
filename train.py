@@ -326,7 +326,10 @@ def attach_head(model, arch: str, head: nn.Module) -> nn.Module:
     if arch.startswith("resnet"):
         model.fc = head; return model
     if arch.startswith("convnext"):
-        model.classifier = nn.Sequential(nn.Flatten(1), head); return model
+        ln   = model.classifier[0]   # LayerNorm
+        flat = model.classifier[1]   # Flatten(1)
+        model.classifier = nn.Sequential(ln, flat, head)
+        return model
     if arch.startswith("efficientnet_v2"):
         model.classifier = nn.Sequential(nn.Dropout(p=0.0, inplace=False), head); return model
     if arch.startswith("mobilenet_v3"):

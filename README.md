@@ -162,3 +162,6 @@ This study compares three loss functions (Focal Loss, Cross-Entropy Loss, and We
 
 ## Conclusion
 The NuImages dataset demonstrates exceptional quality for multiclass object classification tasks. Although underrepresented classes like trailer, bus and construction vehicles, further regularisation and augmentation may improve the already excellent results (relatively test accuracies, low loss) in our experiments. Going forward, we will be implementing a [Camera Image Labelling Assist Tool] (https://huggingface.co/spaces/ImShooShoo/Street-View-Labeling-Assistant).
+
+## Citation
+Caesar, H., et al. (2020). nuScenes: A multimodal dataset for autonomous driving. https://arxiv.org/pdf/1903.11027
