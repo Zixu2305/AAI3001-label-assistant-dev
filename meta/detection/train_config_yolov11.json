@@ -1,0 +1,77 @@
+{
+	"paths": {
+		"proj_root": ".",
+		"meta_dir": "{proj_root}/meta",
+		"det_dir": "{meta_dir}/detection",
+		"ann_dir": "{det_dir}/annotations",
+		"classes_json": "{meta_dir}/classes.json",
+		"manifest_images": "{det_dir}/manifest_images.csv",
+		"manifest_det": "{det_dir}/manifest_det.csv",
+		"train_json": "{ann_dir}/instances_train.json",
+		"val_json": "{ann_dir}/instances_val.json",
+		"dataset_root": "{proj_root}/data/nuimages",
+		"runs_dir": "{proj_root}/runs",
+		"models_out": "{proj_root}/models/detector/v1.0"
+	},
+	"model": {
+		"arch": "yolo11n",
+		"weights": "yolo11n.pt",
+		"device": "cuda",
+		"img_size": 1280,
+		"batch": 16,
+		"workers": 2,
+		"mixed_precision": "fp16",
+		"channels_last": true
+	},
+	"loss": {
+		"box": 9.0,
+		"cls": 0.90,
+		"dfl": 2.0
+	},
+	"train": {
+		"epochs_max": 100,
+		"seed": 42,
+		"save_period": -1,
+		"val_interval": 1,
+		"patience_early_stop": 5,
+		"optimizer": "adamw",
+		"lr0": 0.001,
+		"weight_decay": 0.01,
+		"deterministic": false,
+		"cache": false,
+		"pin_memory": true,
+		"persistent_workers": true,
+		"prefetch_factor": 8,
+		"plots": true
+	},
+	"scheduler": {
+		"type": "reduce_on_plateau",
+		"monitor": "map_50_95",
+		"factor": 0.5,
+		"patience": 3,
+		"threshold": 0.001,
+		"min_lr": 1e-6
+	},
+	"augment": {
+		"auto_augment": "none",
+		"flip_p": 0.5,
+		"hsv_h": 0.015,
+		"hsv_s": 0.7,
+		"hsv_v": 0.4,
+		"scale": 0.0,
+		"translate": 0.0,
+		"mosaic": 0.0,
+		"mixup": 0.0,
+		"perspective": 0.0
+	},
+	"conversion": {
+		"prefer_symlink": true,
+		"reuse_yolo_ds": "runs/yolo_ds_cached",
+		"cleanup_after_train": false
+	},
+	"logging": {
+		"export_metrics_json": true,
+		"metrics_json_path": "{models_out}/metrics.json",
+		"print_batch_shapes": false
+	}
+}

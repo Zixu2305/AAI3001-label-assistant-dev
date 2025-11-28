@@ -1,9 +1,9 @@
 {
   "paths": {
     "proj_root": "/home/shoo/personal/dlDev/school/classificationProject",
-    "meta_dir":  "{proj_root}/meta",
+    "meta_dir":  "{proj_root}/meta/",
     "crops_dir": "{proj_root}/crops",
-    "manifest":  "{meta_dir}/manifest.csv",
+    "manifest":  "{meta_dir}/classification/manifest.csv",
     "classes":   "{meta_dir}/classes.json",
     "runs_dir":  "{proj_root}/runs"
   },

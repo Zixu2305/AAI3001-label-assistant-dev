@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD  = [0.229, 0.224, 0.225]
-
+KD_BATCH_XB = None  # set each batch inside run_epoch so KD loss can access inputs
 
 def seed_everything(seed: int):
     random.seed(seed)
@@ -461,6 +461,8 @@ def run_epoch(model, loader, criterion, optimizer=None, device="cuda", desc="tra
     for batch in pbar:
         if batch is None: continue
         xb, yb = batch
+        global KD_BATCH_XB
+        KD_BATCH_XB = xb
         xb = xb.to(device, non_blocking=True).to(memory_format=torch.channels_last)
         yb = yb.to(device, non_blocking=True)
 
@@ -601,6 +603,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
     ap.add_argument("--run_name", default="")
+    ap.add_argument("--teacher_ckpt", default="", help="Path to a frozen teacher .pth for KD (optional)")
+    ap.add_argument("--kd_lambda", type=float, default=0.5)
+    ap.add_argument("--kd_T", type=float, default=2.0)
+    ap.add_argument("--kd_old_only", action="store_true",
+                    help="Apply KD only on legacy classes (base classes.json) and exclude newly appended ones")
+
     args = ap.parse_args()
 
     with open(args.config, "r") as f:
@@ -624,10 +632,34 @@ def main():
     with open(os.path.join(run_dir, "config.resolved.json"), "w") as f:
         json.dump(cfg, f, indent=2)
 
-    # classes
+    # classes  (allow runtime append via config.class_spec.append without touching the file)
     with open(cfg["paths"]["classes"], "r") as f:
         raw = json.load(f)
-    name_to_id, id_to_name, classes_norm = _parse_classes(raw)
+
+    # base (from file)
+    base_name_to_id, base_id_to_name, base_items = _parse_classes(raw)
+    base_names = [it["name"] for it in base_items]
+
+    # extras from config (optional)
+    extras = []
+    if isinstance(cfg.get("class_spec"), dict):
+        extras = list(cfg["class_spec"].get("append", []))
+
+    # stable union: keep base order, then add new uniques
+    seen = set(base_names)
+    class_names = list(base_names)
+    for n in extras:
+        if n not in seen:
+            class_names.append(n)
+            seen.add(n)
+
+    # rebuild maps (0..C-1 contiguous)
+    name_to_id = {n: i for i, n in enumerate(class_names)}
+    id_to_name = {i: n for i, n in enumerate(class_names)}
+    classes_norm = [{"id": i, "name": n} for i, n in enumerate(class_names)]
+
+    print(f"[classes] Using {len(class_names)} classes: {class_names}")
+
     with open(os.path.join(run_dir, "class_map.json"), "w") as f:
         json.dump(classes_norm, f, indent=2)
 
@@ -639,8 +671,20 @@ def main():
     df = pd.read_csv(cfg["paths"]["manifest"])
     IOU_THR = cfg["filters"]["min_iou"]
     IOA_THR = cfg["filters"]["min_ioa"]
+
+    # --- tolerate manifests without cross-overlap columns ---
+    missing = []
+    if "max_cross_iou" not in df.columns:
+        df["max_cross_iou"] = 0.0
+        missing.append("max_cross_iou")
+    if "max_cross_ioa" not in df.columns:
+        df["max_cross_ioa"] = 0.0
+        missing.append("max_cross_ioa")
+    if missing:
+        print(f"[warn] manifest missing {missing}; defaulting to 0.0 (no cross-overlap filtering).")
+    # -------------------------------------------------------------
+
     df = df.query("max_cross_iou < @IOU_THR and max_cross_ioa < @IOA_THR").reset_index(drop=True)
-    
     df = df[df["class"].isin(name_to_id.keys())].reset_index(drop=True)
     print("Manifest size after filtering:", len(df))
 
@@ -676,6 +720,31 @@ def main():
 
     model.to(device)
     model.to(memory_format=torch.channels_last)
+    # --- Optional: load frozen teacher for KD (usually the previous 10-class checkpoint) ---
+    teacher = None
+    old_class_indices = None  # indices (in student space) corresponding to the legacy classes
+
+    if args.teacher_ckpt:
+        # Re-read the *base* classes (without runtime append) to define "old classes"
+        with open(cfg["paths"]["classes"], "r") as f:
+            raw_base = json.load(f)
+        base_name_to_id, base_id_to_name, base_items = _parse_classes(raw_base)
+        base_names = [it["name"] for it in base_items]
+
+        # Map base names into current name_to_id (handles runtime append order)
+        old_class_indices = [name_to_id[n] for n in base_names if n in name_to_id]
+
+        # Build a teacher with *old-class* head size and same backbone
+        teacher = build_model(cfg, num_classes=len(base_names)).to(device)
+        state = torch.load(args.teacher_ckpt, map_location=device)
+        sd = state.get("model", state)
+        teacher.load_state_dict(sd, strict=True)
+        teacher.eval()
+        for p in teacher.parameters():
+            p.requires_grad = False
+
+        print(f"[KD] Loaded teacher from {args.teacher_ckpt}; old_class_indices={old_class_indices}")
+
 
     # ---------- Stage A ----------
     if cfg["stage_A"]["freeze"] == "all_but_head":
@@ -831,17 +900,59 @@ def main():
         beta=a_cfg.get("beta", 0.999),
         normalize_mean_to_1=a_cfg.get("normalize_mean_to_1", True),
     )
-    critB = FocalLoss(
+    critB_base = FocalLoss(
         alpha=torch.tensor(alphaB, dtype=torch.float32).to(device),
         gamma=cfg["stage_B"]["loss"].get("gamma", 2.0),
         reduction="mean"
+    )
+        # KD wrapper (LwF): supervised loss + lambda * KL(teacher || student) on old classes only (optional)
+    def make_kd_criterion(base_crit, teacher_model, old_idx, kd_lambda: float, T: float, kd_old_only: bool):
+        if not teacher_model:
+            return base_crit  # KD off
+
+        old_idx_tensor = None
+        if kd_old_only and old_idx is not None and len(old_idx) > 0:
+            old_idx_tensor = torch.tensor(sorted(old_idx), dtype=torch.long, device=device)
+
+        def kd_loss(student_logits, targets):
+            # supervised term
+            sup = base_crit(student_logits, targets)
+
+            # teacher forward on the current batch inputs
+            with torch.no_grad():
+                xb = KD_BATCH_XB.to(device).to(memory_format=torch.channels_last)
+                t_logits = teacher_model(xb)
+
+            # temperature-scaled probabilities
+            s_logp = F.log_softmax(student_logits / T, dim=1)
+            t_p    = F.softmax(t_logits / T, dim=1)
+
+            # restrict to old-class columns if requested
+            if old_idx_tensor is not None:
+                s_logp = torch.index_select(s_logp, 1, old_idx_tensor)
+                t_p    = torch.index_select(t_p, 1, old_idx_tensor)
+
+            # KL(teacher || student)
+            kl = torch.sum(t_p * (torch.log(torch.clamp(t_p, 1e-8, 1.0)) - s_logp), dim=1).mean()
+
+            return sup + kd_lambda * (T * T) * kl
+
+        return kd_loss
+
+    critB_train = make_kd_criterion(
+        critB_base,
+        teacher_model=teacher,
+        old_idx=old_class_indices,
+        kd_lambda=float(getattr(args, "kd_lambda", 0.0)),
+        T=float(getattr(args, "kd_T", 2.0)),
+        kd_old_only=bool(getattr(args, "kd_old_only", False)),
     )
 
     # Train Stage B (early stopping kept; AMP handled inside run_epoch)
     epoch_base, _ = train_stage(
         "StageB",
         model, train_loader, val_loader,
-        critB, optB,
+        critB_train, optB,
         scheduler_epoch=schB_epoch,                  # RoP (epoch-level) if chosen
         epochs=cfg["stage_B"]["epochs"],
         log_csv=log_csv, best_ckpt_path=best_ckpt,
@@ -856,8 +967,8 @@ def main():
     # Evaluate BEST checkpoint on val & test and log
     best = torch.load(best_ckpt, map_location=device)
     model.load_state_dict(best["model"])
-    val_loss,  val_acc,  val_f1  = evaluate(model, val_loader,  critB, device)
-    test_loss, test_acc, test_f1 = evaluate(model, test_loader, critB, device)
+    val_loss,  val_acc,  val_f1  = evaluate(model, val_loader,  critB_base, device)
+    test_loss, test_acc, test_f1 = evaluate(model, test_loader, critB_base, device)
     csv_logger_write(log_csv, {"stage":"BEST_VAL","epoch":0,"cum_epoch":epoch_base,
         "train_loss":"","train_acc":"","train_macro_f1":"",
         "val_loss":val_loss,"val_acc":val_acc,"val_macro_f1":val_f1,"lr":""})

@@ -4,3 +4,8 @@
 /logs
 /model
 /runs
+/meta/al/exemplar
+/meta/al/run
+/meta/al/datasets*
+/meta/al/pseudo
+/meta/al/exemplar_crops
